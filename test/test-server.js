@@ -113,7 +113,8 @@ describe('BlogPosts', function() {
     // we can make a second, PUT call to the app.
     const updateData = {
       title: 'Time',
-      content: "keeps on ticking into the future"
+      content: "keeps on ticking into the future",
+      author: "Jem"
     };
 
     return chai.request(app)
