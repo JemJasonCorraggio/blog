@@ -4,7 +4,7 @@ const BlogSchema = mongoose.Schema( {
       title: {type: String, required: true},
       content: {type: String, required: true},
       author: {firstName: {type: String, required: true}, lastName: {type: String, required: true}},
-      created: Date.now()
+      created: {type: Number}
     });
 
 BlogSchema.virtual('authorString').get(function() {
@@ -17,7 +17,7 @@ BlogSchema.methods.apiRepr = function() {
     title: this.title,
     author: this.authorString,
     content: this.content,
-    created: this.created,
+    created: Date.now(),
   };
 };
 const BlogPost = mongoose.model('BlogPost',BlogSchema);
