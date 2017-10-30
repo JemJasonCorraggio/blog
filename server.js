@@ -5,7 +5,7 @@ mongoose.Promise = global.Promise;
 const bodyParser = require('body-parser');
 
 const {PORT, DATABASE_URL} = require('./config');
-const {BlogPost} = require('./models');
+const {Blogpost} = require('./models');
 
 const app = express();
 app.use(bodyParser.json());
@@ -20,35 +20,36 @@ app.use(morgan('common'));
 // runServer runs, it assigns a value.
 let server;
 
-// this function starts our server and returns a Promise.
-// In our test code, we need a way of asynchronously starting
-// our server, since we'll be dealing with promises there.
-function runServer() {
-  const port = process.env.PORT || 8080;
+function runServer(databaseUrl=DATABASE_URL, port=PORT) {
   return new Promise((resolve, reject) => {
-    server = app.listen(port, () => {
-      console.log(`Your app is listening on port ${port}`);
-      resolve(server);
-    }).on('error', err => {
-      reject(err);
+    mongoose.connect(databaseUrl, err => {
+      if (err) {
+        return reject(err);
+      }
+
+      server = app.listen(port, () => {
+        console.log(`Your app is listening on port ${port}`);
+        resolve();
+      })
+      .on('error', err => {
+        mongoose.disconnect();
+        reject(err);
+      });
     });
   });
 }
 
-// like `runServer`, this function also needs to return a promise.
-// `server.close` does not return a promise on its own, so we manually
-// create one.
 function closeServer() {
-  return new Promise((resolve, reject) => {
-    console.log('Closing server');
-    server.close(err => {
-      if (err) {
-        reject(err);
-        // so we don't also call `resolve()`
-        return;
-      }
-      resolve();
-    });
+  return mongoose.disconnect().then(() => {
+     return new Promise((resolve, reject) => {
+       console.log('Closing server');
+       server.close(err => {
+           if (err) {
+               return reject(err);
+           }
+           resolve();
+       });
+     });
   });
 }
 
@@ -64,11 +65,12 @@ if (require.main === module) {
 // when the root of this router is called with GET, return
 // all current BlogPost items
 app.get('/posts', (req, res) => {
-    BlogPost
+    Blogpost
         .find()
-        .then(BlogPosts => res.json(
-            BlogPosts.map(blogPost => blogPost.apiRepr())
-        ))
+        .then(blogposts => { res.json({
+            blogposts: blogposts.map((blogpost) => blogpost.apiRepr())
+            });
+        })
         .catch(err => {
             console.error(err);
             res.status(500).json({message: 'Internal server error'});
@@ -77,11 +79,11 @@ app.get('/posts', (req, res) => {
 
 // can also request by ID
 app.get('/posts/:id', (req, res) => {
-  BlogPost
+  Blogpost
     // this is a convenience method Mongoose provides for searching
     // by the object _id property
     .findById(req.params.id)
-    .then(blogPost =>res.json(blogPost.apiRepr()))
+    .then(blogpost =>res.json(blogpost.apiRepr()))
     .catch(err => {
       console.error(err);
         res.status(500).json({message: 'Internal server error'});
@@ -100,14 +102,14 @@ app.post('/posts', (req, res) => {
     }
   }
 
-  BlogPost
+  Blogpost
     .create({
       title: req.body.title,
       author: req.body.author,
       content: req.body.content
     })
     .then(
-      blogPost => res.status(201).json(blogPost.apiRepr()))
+      blogpost => res.status(201).json(blogpost.apiRepr()))
     .catch(err => {
       console.error(err);
       res.status(500).json({message: 'Internal server error'});
@@ -141,18 +143,18 @@ app.put('/posts/:id', (req, res) => {
     }
   });
 
-  BlogPost
+  Blogpost
     // all key/value pairs in toUpdate will be updated -- that's what `$set` does
     .findByIdAndUpdate(req.params.id, {$set: toUpdate})
-    .then(blogPost => res.status(204).end())
+    .then(blogpost => res.status(204).end())
     .catch(err => res.status(500).json({message: 'Internal server error'}));
 });
 
 
 // when DELETE request comes in with an id in path,
 // try to delete that item from BlogPosts.
-app.delete('/restaurants/:id', (req, res) => {
-  BlogPost
+app.delete('/posts/:id', (req, res) => {
+  Blogpost
     .findByIdAndRemove(req.params.id)
     .then(restaurant => res.status(204).end())
     .catch(err => res.status(500).json({message: 'Internal server error'}));

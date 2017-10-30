@@ -20,5 +20,5 @@ BlogSchema.methods.apiRepr = function() {
     created: Date.now(),
   };
 };
-const BlogPost = mongoose.model('BlogPost',BlogSchema);
-module.exports = {BlogPost};
+const Blogpost = mongoose.model('Blogpost',BlogSchema);
+module.exports = {Blogpost};

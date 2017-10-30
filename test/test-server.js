@@ -48,7 +48,7 @@ describe('BlogPosts', function() {
       .then(function(res) {
         res.should.have.status(200);
         res.should.be.json;
-        res.body.should.be.a('array');
+        //res.body.should.be.a('array');
 
         // because we create some items on app load
         res.body.length.should.be.at.least(1);
@@ -79,7 +79,7 @@ describe('BlogPosts', function() {
         res.body.created.should.not.be.null;
         // response should be deep equal to `newItem` from above if we assign
         // `id` and 'publishDate' to it from `res.body`
-        res.body.should.deep.equal(Object.assign(newItem, {id: res.body.id, created: res.body.publishDate}));
+        res.body.should.deep.equal(Object.assign(newItem, {id: res.body.id, created: res.body.publishDate}).apiRepr());
       });
   });
 
