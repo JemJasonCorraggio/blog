@@ -44,7 +44,7 @@ describe('BlogPosts', function() {
     // at the end of the test. The `chai.request(server).get...` call is asynchronous
     // and returns a Promise, so we just return it.
     return chai.request(app)
-      .get('/blog-posts')
+      .get('/posts')
       .then(function(res) {
         res.should.have.status(200);
         res.should.be.json;
@@ -53,7 +53,7 @@ describe('BlogPosts', function() {
         // because we create some items on app load
         res.body.length.should.be.at.least(1);
         // each item should be an object with correct key/value pairs
-        const expectedKeys = ['id', 'title', 'author', 'content', 'publishDate'];
+        const expectedKeys = ['id', 'title', 'author', 'content', 'created'];
         res.body.forEach(function(item) {
           item.should.be.a('object');
           item.should.include.keys(expectedKeys);
@@ -66,39 +66,23 @@ describe('BlogPosts', function() {
   //  2. inspect response object and prove it has right
   //  status code and that the returned object has an `id`
   it('should add an item on POST w/o publishDate', function() {
-    const newItem = {title: 'Every Other Day', content: "of the week is fine", author: "Jem"};
+    const newItem = {title: 'Every Other Day', content: "of the week is fine", author:{firstName: "Jem", lastName: "Corraggio"}};
     return chai.request(app)
-      .post('/blog-posts')
+      .post('/posts')
       .send(newItem)
       .then(function(res) {
         res.should.have.status(201);
         res.should.be.json;
         res.body.should.be.a('object');
-        res.body.should.include.keys('id', 'title', 'content', 'author', 'publishDate');
+        res.body.should.include.keys('id', 'title', 'content', 'author', 'created');
         res.body.id.should.not.be.null;
-        res.body.publishDate.should.not.be.null;
+        res.body.created.should.not.be.null;
         // response should be deep equal to `newItem` from above if we assign
         // `id` and 'publishDate' to it from `res.body`
-        res.body.should.deep.equal(Object.assign(newItem, {id: res.body.id, publishDate: res.body.publishDate}));
+        res.body.should.deep.equal(Object.assign(newItem, {id: res.body.id, created: res.body.publishDate}));
       });
   });
- it('should add an item on POST w/ publishDate', function() {
-    const newItem = {title: 'Whenever Monday Comes', content: "you can find me crying all of the time", author: "Jem", publishDate: "10.30"};
-    return chai.request(app)
-      .post('/blog-posts')
-      .send(newItem)
-      .then(function(res) {
-        res.should.have.status(201);
-        res.should.be.json;
-        res.body.should.be.a('object');
-        res.body.should.include.keys('id', 'title', 'content', 'author', 'publishDate');
-        res.body.id.should.not.be.null;
-        res.body.publishDate.should.not.be.null;
-        // response should be deep equal to `newItem` from above if we assign
-        // `id` and 'publishDate' to it from `res.body`
-        res.body.should.deep.equal(Object.assign(newItem, {id: res.body.id}));
-      });
-  });
+
   // test strategy:
   //  1. initialize some update data (we won't have an `id` yet)
   //  2. make a GET request so we can get an item to update
@@ -114,12 +98,11 @@ describe('BlogPosts', function() {
     const updateData = {
       title: 'Time',
       content: "keeps on ticking into the future",
-      author: "Jem"
     };
 
     return chai.request(app)
       // first have to get so we have an idea of object to update
-      .get('/blog-posts')
+      .get('/posts')
       .then(function(res) {
         updateData.id = res.body[0].id;
         // this will return a promise whose value will be the response
@@ -128,7 +111,7 @@ describe('BlogPosts', function() {
         // returning a promise and chaining with `then`, but we find
         // this approach cleaner and easier to read and reason about.
         return chai.request(app)
-          .put(`/blog-posts/${updateData.id}`)
+          .put(`/posts/${updateData.id}`)
           .send(updateData);
       })
       // prove that the PUT request has right status code
@@ -145,10 +128,10 @@ describe('BlogPosts', function() {
     return chai.request(app)
       // first have to get so we have an `id` of item
       // to delete
-      .get('/blog-posts')
+      .get('/posts')
       .then(function(res) {
         return chai.request(app)
-          .delete(`/blog-posts/${res.body[0].id}`);
+          .delete(`/posts/${res.body[0].id}`);
       })
       .then(function(res) {
         res.should.have.status(204);

@@ -1,8 +1,14 @@
 const express = require('express');
-//const router = express.Router();
 const morgan = require('morgan');
-const app = express();
+const mongoose = require('mongoose');
+mongoose.Promise = global.Promise;
+const bodyParser = require('body-parser');
 
+const {PORT, DATABASE_URL} = require('./config');
+const {BlogPost} = require('./models');
+
+const app = express();
+app.use(bodyParser.json());
 
 
 // log the http layer
@@ -53,27 +59,38 @@ if (require.main === module) {
 };
 
 
-const bodyParser = require('body-parser');
-
-const {BlogPosts} = require('./models');
-
-const jsonParser = bodyParser.json();
-
-// we're going to add some items to BlogPosts
-// so there's some data to look at
-BlogPosts.create('Yesterday', "Was plain awful", "Jem", "10.24");
-BlogPosts.create('Tomorrow', "I love you", "Jem", "10.26");
 
 
 // when the root of this router is called with GET, return
 // all current BlogPost items
-app.get('/blog-posts', (req, res) => {
-  res.json(BlogPosts.get());
+app.get('/posts', (req, res) => {
+    BlogPost
+        .find()
+        .then(BlogPosts => res.json(
+            BlogPosts.map(blogPost => blogPost.apiRepr())
+        ))
+        .catch(err => {
+            console.error(err);
+            res.status(500).json({message: 'Internal server error'});
+        });
 });
 
-app.post('/blog-posts', jsonParser, (req, res) => {
-  // ensure `title`, 'content', and 'author' are in request body
-  const requiredFields = ['title', 'content', 'author'];
+// can also request by ID
+app.get('/posts/:id', (req, res) => {
+  BlogPost
+    // this is a convenience method Mongoose provides for searching
+    // by the object _id property
+    .findById(req.params.id)
+    .then(blogPost =>res.json(blogPost.apiRepr()))
+    .catch(err => {
+      console.error(err);
+        res.status(500).json({message: 'Internal server error'});
+    });
+});
+
+app.post('/posts', (req, res) => {
+
+  const requiredFields = ['title', 'author', 'content'];
   for (let i=0; i<requiredFields.length; i++) {
     const field = requiredFields[i];
     if (!(field in req.body)) {
@@ -83,8 +100,18 @@ app.post('/blog-posts', jsonParser, (req, res) => {
     }
   }
 
-  const item = BlogPosts.create(req.body.title, req.body.content, req.body.author, req.body.publishDate);
-  res.status(201).json(item);
+  BlogPost
+    .create({
+      title: req.body.title,
+      author: req.body.author,
+      content: req.body.content
+    })
+    .then(
+      blogPost => res.status(201).json(blogPost.apiRepr()))
+    .catch(err => {
+      console.error(err);
+      res.status(500).json({message: 'Internal server error'});
+    });
 });
 
 // when PUT request comes in with updated item, ensure has
@@ -92,41 +119,47 @@ app.post('/blog-posts', jsonParser, (req, res) => {
 // item id in updated item object match. if problems with any
 // of that, log error and send back status code 400. otherwise
 // call `BlogPosts.update` with updated item.
-app.put('/blog-posts/:id', jsonParser, (req, res) => {
-  const requiredFields = ['title', 'author', 'content', 'id'];
-  for (let i=0; i<requiredFields.length; i++) {
-    const field = requiredFields[i];
-    if (!(field in req.body)) {
-      const message = `Missing \`${field}\` in request body`;
-      console.error(message);
-      return res.status(400).send(message);
-    }
+app.put('/posts/:id', (req, res) => {
+  // ensure that the id in the request path and the one in request body match
+  if (!(req.params.id && req.body.id && req.params.id === req.body.id)) {
+    const message = (
+      `Request path id (${req.params.id}) and request body id ` +
+      `(${req.body.id}) must match`);
+    console.error(message);
+    return res.status(400).json({message: message});
   }
 
-  if (req.params.id !== req.body.id) {
-    const message = `Request path id (${req.params.id}) and request body id (${req.body.id}) must match`;
-    console.error(message);
-    return res.status(400).send(message);
-  }
-  console.log(`Updating blog item \`${req.params.id}\``);
-  BlogPosts.update({
-    id: req.params.id,
-    title: req.body.title,
-    content: req.body.content,
-    author: req.body.author,
-    publishDate: req.body.publishDate
+  // we only support a subset of fields being updateable.
+  // if the user sent over any of the updatableFields, we udpate those values
+  // in document
+  const toUpdate = {};
+  const updateableFields = ['title', 'author', 'content'];
+
+  updateableFields.forEach(field => {
+    if (field in req.body) {
+      toUpdate[field] = req.body[field];
+    }
   });
-  res.status(204).end();
+
+  BlogPost
+    // all key/value pairs in toUpdate will be updated -- that's what `$set` does
+    .findByIdAndUpdate(req.params.id, {$set: toUpdate})
+    .then(blogPost => res.status(204).end())
+    .catch(err => res.status(500).json({message: 'Internal server error'}));
 });
 
 
 // when DELETE request comes in with an id in path,
 // try to delete that item from BlogPosts.
-app.delete('/blog-posts/:id', (req, res) => {
-  BlogPosts.delete(req.params.id);
-  console.log(`Deleted blog item \`${req.params.ID}\``);
-  res.status(204).end();
+app.delete('/restaurants/:id', (req, res) => {
+  BlogPost
+    .findByIdAndRemove(req.params.id)
+    .then(restaurant => res.status(204).end())
+    .catch(err => res.status(500).json({message: 'Internal server error'}));
 });
 
+app.use('*', function(req, res) {
+  res.status(404).json({message: 'Not Found'});
+});
 
 module.exports = {app, runServer, closeServer};
